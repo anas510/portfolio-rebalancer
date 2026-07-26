@@ -1,0 +1,426 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===========================================================================
+   PSX Portfolio Rebalancer — modern, calm fintech UI
+   Soft elevated cards, airy spacing, one confident emerald accent, geometric
+   sans throughout with mono reserved for figures/tickers.
+   =========================================================================== */
+
+:root {
+  color-scheme: light;
+  --ink: #101828;
+  --ink-soft: #667085;
+  --ink-faint: #98a2b3;
+  --paper: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #f2f4f7;
+  --rule: #eaecf0;
+  --rule-strong: #d0d5dd;
+  --green: #0e9f6e;
+  --green-strong: #0b7a54;
+  --green-tint: #e6f6ef;
+  --red: #e5484d;
+  --red-tint: #fdecec;
+  --brass: #0e9f6e; /* legacy alias -> accent */
+
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
+  --shadow-md: 0 4px 12px rgba(16, 24, 40, 0.06), 0 2px 6px rgba(16, 24, 40, 0.04);
+
+  --display: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --r-card: 16px;
+  --r-ctrl: 10px;
+}
+
+body {
+  background-color: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+}
+
+.tabular,
+.mono {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  letter-spacing: 0;
+}
+
+/* ---- Structural devices --------------------------------------------------- */
+
+.eyebrow {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--green-strong);
+}
+
+/* numbered step chip — soft, round, not a box */
+.folio {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--green-tint);
+  color: var(--green-strong);
+  font-size: 12px;
+  font-weight: 700;
+  font-family: var(--sans);
+}
+
+.section-title {
+  font-family: var(--display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+/* ---- Card ----------------------------------------------------------------- */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-card);
+  padding: 1.5rem 1.6rem 1.6rem;
+  box-shadow: var(--shadow-sm);
+}
+
+/* ---- Buttons -------------------------------------------------------------- */
+
+.btn,
+.btn-primary,
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border-radius: var(--r-ctrl);
+  padding: 0.55rem 1.05rem;
+  font-size: 13.5px;
+  font-weight: 600;
+  font-family: var(--sans);
+  letter-spacing: -0.01em;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.05s;
+  cursor: pointer;
+}
+.btn:active:not(:disabled),
+.btn-primary:active:not(:disabled),
+.btn-ghost:active:not(:disabled) {
+  transform: translateY(0.5px);
+}
+.btn:disabled,
+.btn-primary:disabled,
+.btn-ghost:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.btn-primary {
+  background: var(--green);
+  color: #fff;
+  border: 1px solid var(--green);
+  box-shadow: 0 1px 2px rgba(14, 159, 110, 0.25);
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--green-strong);
+  border-color: var(--green-strong);
+}
+.btn-ghost {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--rule-strong);
+}
+.btn-ghost:hover:not(:disabled) {
+  background: var(--surface-2);
+  border-color: var(--ink-faint);
+}
+
+/* ---- Segmented control ---------------------------------------------------- */
+
+.seg {
+  display: inline-flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--rule);
+}
+.seg-item {
+  padding: 0.42rem 0.95rem;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--sans);
+  color: var(--ink-soft);
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s, box-shadow 0.15s;
+}
+.seg-item[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+}
+.seg-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ---- Inputs --------------------------------------------------------------- */
+
+.input {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-ctrl);
+  padding: 0.5rem 0.7rem;
+  font-size: 13.5px;
+  font-family: var(--sans);
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.input:focus {
+  border-color: var(--green);
+  box-shadow: 0 0 0 4px var(--green-tint);
+}
+/* numeric-ish inputs read as figures */
+input.input[type="number"],
+input.input.uppercase {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+textarea.input {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.55;
+}
+select.input {
+  cursor: pointer;
+  min-width: 200px;
+  padding-right: 2rem;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23667085' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 0.65rem center;
+}
+
+/* ---- Toolbars / grouped controls ----------------------------------------- */
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.toolbar-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.toolbar-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.toolbar-divider {
+  width: 1px;
+  align-self: stretch;
+  min-height: 34px;
+  background: var(--rule-strong);
+  margin: 0 4px;
+}
+.subpanel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.link {
+  color: var(--green-strong);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+.link:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ---- Tables --------------------------------------------------------------- */
+
+.ledger-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.card table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.card thead th,
+.th {
+  padding: 0.7rem 0.85rem;
+  text-align: left;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  background: var(--surface);
+  border-bottom: 1px solid var(--rule);
+  white-space: nowrap;
+}
+.card tbody td,
+.td {
+  padding: 0.65rem 0.85rem;
+  font-size: 13.5px;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  border-bottom: 1px solid var(--rule);
+  vertical-align: middle;
+}
+.card tbody tr:last-child td {
+  border-bottom: none;
+}
+.card tbody tr {
+  transition: background-color 0.12s;
+}
+.card tbody tr:hover td {
+  background: var(--surface-2);
+}
+.card tfoot td {
+  padding: 0.75rem 0.85rem;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  border-top: 1px solid var(--rule-strong);
+  background: var(--surface-2);
+}
+
+/* ---- Badges (soft pills) -------------------------------------------------- */
+
+.badge-buy,
+.badge-sell,
+.badge-hold {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  padding: 2px 10px;
+  border-radius: 999px;
+}
+.badge-buy {
+  color: var(--green-strong);
+  background: var(--green-tint);
+}
+.badge-sell {
+  color: #b42318;
+  background: var(--red-tint);
+}
+.badge-hold {
+  color: var(--ink-soft);
+  background: var(--surface-2);
+}
+
+/* ---- Summary stat cards --------------------------------------------------- */
+
+.stat {
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 0.85rem 0.95rem;
+  box-shadow: var(--shadow-sm);
+}
+.stat-label {
+  font-family: var(--sans);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+.stat-value {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-top: 2px;
+  letter-spacing: -0.01em;
+}
+.stat-value.neg {
+  color: var(--red);
+}
+
+/* ---- Notices -------------------------------------------------------------- */
+
+.notice {
+  border: 1px solid #f5c26b;
+  background: #fffaf0;
+  border-radius: 12px;
+  padding: 0.75rem 0.9rem;
+  font-size: 12.5px;
+  color: #93540b;
+}
+
+/* ---- Motion / a11y -------------------------------------------------------- */
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.rise {
+  animation: rise 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise {
+    animation: none;
+  }
+}
