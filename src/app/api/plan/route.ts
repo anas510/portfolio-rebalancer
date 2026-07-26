@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getEffectiveModel, getSelectedPortfolioId, saveRun } from "@/lib/repo";
+import { getEffectiveModel, getSelectedPortfolioId, saveRun, ForbiddenError } from "@/lib/repo";
+import { requireUser } from "@/lib/auth";
 import { rebalance } from "@/lib/rebalance";
 import { fetchLivePrices } from "@/lib/psx";
 import type { ActualHolding, ModelHolding } from "@/lib/types";
@@ -26,12 +27,13 @@ interface PlanRequest {
 /** POST /api/plan -> compute a rebalancing plan. */
 export async function POST(req: Request) {
   try {
+    const user = await requireUser();
     const body = (await req.json()) as PlanRequest;
 
     let model = body.model;
     if (!model || model.length === 0) {
-      const id = body.portfolioId ?? (await getSelectedPortfolioId());
-      const saved = await getEffectiveModel(id);
+      const id = body.portfolioId ?? (await getSelectedPortfolioId(user.id));
+      const saved = await getEffectiveModel(user.id, id);
       if (!saved) {
         return NextResponse.json(
           { error: "No model portfolio saved. Upload/enter and save one first." },
@@ -75,11 +77,15 @@ export async function POST(req: Request) {
     });
 
     if (body.save) {
-      await saveRun(plan.totals.cashAvailable, plan.totals.investableTotal, JSON.stringify(plan));
+      await saveRun(user.id, plan.totals.cashAvailable, plan.totals.investableTotal, JSON.stringify(plan));
     }
 
     return NextResponse.json({ plan });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    if (err instanceof ForbiddenError) {
+      return NextResponse.json({ error: err.message }, { status: 403 });
+    }
+    const status = err && typeof err === "object" && "status" in err ? Number((err as { status: number }).status) : 500;
+    return NextResponse.json({ error: String(err) }, { status });
   }
 }

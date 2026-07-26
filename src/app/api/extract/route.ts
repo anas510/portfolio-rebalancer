@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { extractWithVision, isVisionAvailable, type ExtractKind } from "@/lib/vision";
 import { getAliases } from "@/lib/repo";
+import { requireUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,6 +18,7 @@ interface ExtractRequest {
  */
 export async function POST(req: Request) {
   try {
+    await requireUser();
     if (!isVisionAvailable()) {
       return NextResponse.json(
         { error: "Claude Vision is not configured. Set ANTHROPIC_API_KEY to enable it." },

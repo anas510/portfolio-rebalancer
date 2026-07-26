@@ -1,94 +1,8 @@
-import { SignJWT, jwtVerify } from "jose";
-import { cookies } from "next/headers";
-import type { NextRequest } from "next/server";
 import { db } from "./db";
 import { hashPassword, verifyPassword } from "./password";
+import { getSessionUser, setSessionCookie, clearSessionCookie, type SessionUser } from "./session";
 
-export const SESSION_COOKIE = "pr_session";
-const SESSION_DAYS = 30;
-
-export interface SessionUser {
-  id: number;
-  email: string;
-  isAdmin: boolean;
-}
-
-type Row = Record<string, unknown>;
-
-function getAuthSecret(): Uint8Array {
-  const secret = process.env.AUTH_SECRET;
-  if (!secret || secret.length < 32) {
-    throw new Error("AUTH_SECRET must be set to a random string of at least 32 characters.");
-  }
-  return new TextEncoder().encode(secret);
-}
-
-export async function createSessionToken(user: SessionUser): Promise<string> {
-  return new SignJWT({ email: user.email, isAdmin: user.isAdmin })
-    .setProtectedHeader({ alg: "HS256" })
-    .setSubject(String(user.id))
-    .setIssuedAt()
-    .setExpirationTime(`${SESSION_DAYS}d`)
-    .sign(getAuthSecret());
-}
-
-export async function verifySessionToken(token: string): Promise<SessionUser | null> {
-  try {
-    const { payload } = await jwtVerify(token, getAuthSecret());
-    const id = Number(payload.sub);
-    if (!id || !payload.email) return null;
-    return {
-      id,
-      email: String(payload.email),
-      isAdmin: Boolean(payload.isAdmin),
-    };
-  } catch {
-    return null;
-  }
-}
-
-export function sessionCookieOptions(maxAgeSeconds: number) {
-  return {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax" as const,
-    path: "/",
-    maxAge: maxAgeSeconds,
-  };
-}
-
-export async function setSessionCookie(user: SessionUser): Promise<void> {
-  const token = await createSessionToken(user);
-  cookies().set(SESSION_COOKIE, token, sessionCookieOptions(SESSION_DAYS * 24 * 60 * 60));
-}
-
-export async function clearSessionCookie(): Promise<void> {
-  cookies().set(SESSION_COOKIE, "", sessionCookieOptions(0));
-}
-
-export async function getSessionFromRequest(req: NextRequest): Promise<SessionUser | null> {
-  const token = req.cookies.get(SESSION_COOKIE)?.value;
-  if (!token) return null;
-  return verifySessionToken(token);
-}
-
-export async function getSessionUser(): Promise<SessionUser | null> {
-  const token = cookies().get(SESSION_COOKIE)?.value;
-  if (!token) return null;
-  return verifySessionToken(token);
-}
-
-export async function requireUser(): Promise<SessionUser> {
-  const user = await getSessionUser();
-  if (!user) throw new AuthError("Unauthorized", 401);
-  return user;
-}
-
-export async function requireAdmin(): Promise<SessionUser> {
-  const user = await requireUser();
-  if (!user.isAdmin) throw new AuthError("Forbidden", 403);
-  return user;
-}
+export { setSessionCookie, clearSessionCookie, getSessionUser, type SessionUser } from "./session";
 
 export class AuthError extends Error {
   status: number;
@@ -96,6 +10,23 @@ export class AuthError extends Error {
     super(message);
     this.status = status;
   }
+}
+
+export async function requireUser(): Promise<SessionUser> {
+  const user = await getSessionUser();
+  if (!user) throw new AuthError("Unauthorized", 401);
+
+  const row = await getUserById(user.id);
+  if (!row) throw new AuthError("Unauthorized", 401);
+  if (row.isBlocked) throw new AuthError("This account has been blocked.", 403);
+
+  return user;
+}
+
+export async function requireAdmin(): Promise<SessionUser> {
+  const user = await requireUser();
+  if (!user.isAdmin) throw new AuthError("Forbidden", 403);
+  return user;
 }
 
 export function validateEmail(email: string): string | null {
@@ -109,12 +40,14 @@ export function validatePassword(password: string): string | null {
   return null;
 }
 
-// ---- User persistence -------------------------------------------------------
+type Row = Record<string, unknown>;
 
-export async function findUserByEmail(email: string): Promise<{ id: number; email: string; passwordHash: string; isAdmin: boolean } | null> {
+export async function findUserByEmail(
+  email: string
+): Promise<{ id: number; email: string; passwordHash: string; isAdmin: boolean; isBlocked: boolean } | null> {
   const client = await db();
   const res = await client.execute({
-    sql: "SELECT id, email, password_hash, is_admin FROM user WHERE email = ?",
+    sql: "SELECT id, email, password_hash, is_admin, is_blocked FROM user WHERE email = ?",
     args: [email.trim().toLowerCase()],
   });
   if (res.rows.length === 0) return null;
@@ -124,6 +57,7 @@ export async function findUserByEmail(email: string): Promise<{ id: number; emai
     email: String(row.email),
     passwordHash: String(row.password_hash),
     isAdmin: Number(row.is_admin) === 1,
+    isBlocked: Number(row.is_blocked ?? 0) === 1,
   };
 }
 
@@ -146,6 +80,9 @@ export async function authenticateUser(email: string, password: string): Promise
   if (!user || !(await verifyPassword(password, user.passwordHash))) {
     throw new AuthError("Invalid email or password.", 401);
   }
+  if (user.isBlocked) {
+    throw new AuthError("This account has been blocked. Contact support.", 403);
+  }
   return { id: user.id, email: user.email, isAdmin: user.isAdmin };
 }
 
@@ -153,6 +90,7 @@ export interface AdminUserRow {
   id: number;
   email: string;
   isAdmin: boolean;
+  isBlocked: boolean;
   createdAt: string;
   portfolioCount: number;
 }
@@ -160,7 +98,7 @@ export interface AdminUserRow {
 export async function getAdminStats(): Promise<{ totalUsers: number; users: AdminUserRow[] }> {
   const client = await db();
   const res = await client.execute(`
-    SELECT u.id, u.email, u.is_admin, u.created_at,
+    SELECT u.id, u.email, u.is_admin, u.is_blocked, u.created_at,
            (SELECT COUNT(*) FROM portfolio p WHERE p.user_id = u.id) AS portfolio_count
     FROM user u
     ORDER BY u.created_at DESC
@@ -171,9 +109,75 @@ export async function getAdminStats(): Promise<{ totalUsers: number; users: Admi
       id: Number(row.id),
       email: String(row.email),
       isAdmin: Number(row.is_admin) === 1,
+      isBlocked: Number(row.is_blocked ?? 0) === 1,
       createdAt: String(row.created_at),
       portfolioCount: Number(row.portfolio_count ?? 0),
     };
   });
   return { totalUsers: users.length, users };
+}
+
+async function getUserById(id: number): Promise<{ id: number; email: string; isAdmin: boolean; isBlocked: boolean } | null> {
+  const client = await db();
+  const res = await client.execute({
+    sql: "SELECT id, email, is_admin, is_blocked FROM user WHERE id = ?",
+    args: [id],
+  });
+  if (res.rows.length === 0) return null;
+  const row = res.rows[0] as Row;
+  return {
+    id: Number(row.id),
+    email: String(row.email),
+    isAdmin: Number(row.is_admin) === 1,
+    isBlocked: Number(row.is_blocked ?? 0) === 1,
+  };
+}
+
+async function countAdmins(): Promise<number> {
+  const client = await db();
+  const res = await client.execute("SELECT COUNT(*) AS c FROM user WHERE is_admin = 1");
+  return Number((res.rows[0] as Row).c ?? 0);
+}
+
+function assertCanModifyUser(actor: SessionUser, target: { id: number; isAdmin: boolean }, action: string): void {
+  if (target.id === actor.id) {
+    throw new AuthError(`You cannot ${action} your own account.`, 400);
+  }
+}
+
+export async function setUserBlocked(actor: SessionUser, userId: number, blocked: boolean): Promise<void> {
+  const target = await getUserById(userId);
+  if (!target) throw new AuthError("User not found.", 404);
+  assertCanModifyUser(actor, target, blocked ? "block" : "unblock");
+
+  const client = await db();
+  await client.execute({
+    sql: "UPDATE user SET is_blocked = ? WHERE id = ?",
+    args: [blocked ? 1 : 0, userId],
+  });
+}
+
+export async function deleteUser(actor: SessionUser, userId: number): Promise<void> {
+  const target = await getUserById(userId);
+  if (!target) throw new AuthError("User not found.", 404);
+  assertCanModifyUser(actor, target, "delete");
+
+  if (target.isAdmin && (await countAdmins()) <= 1) {
+    throw new AuthError("Cannot delete the last admin account.", 400);
+  }
+
+  const client = await db();
+
+  await client.execute({
+    sql: "DELETE FROM portfolio_holding WHERE portfolio_id IN (SELECT id FROM portfolio WHERE user_id = ?)",
+    args: [userId],
+  });
+  await client.execute({ sql: "DELETE FROM portfolio WHERE user_id = ?", args: [userId] });
+  await client.execute({
+    sql: "DELETE FROM model_holding WHERE model_id IN (SELECT id FROM model_portfolio WHERE user_id = ?)",
+    args: [userId],
+  });
+  await client.execute({ sql: "DELETE FROM model_portfolio WHERE user_id = ?", args: [userId] });
+  await client.execute({ sql: "DELETE FROM rebalance_run WHERE user_id = ?", args: [userId] });
+  await client.execute({ sql: "DELETE FROM user WHERE id = ?", args: [userId] });
 }

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import AuthHeader from "@/components/AuthHeader";
 
 export const metadata: Metadata = {
   title: "PSX Portfolio Rebalancer",
@@ -56,6 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 Pakistan Stock Exchange
               </p>
             </div>
+            <AuthHeader />
           </div>
         </header>
 
