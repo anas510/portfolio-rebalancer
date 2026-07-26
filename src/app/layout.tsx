@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import "./globals.css";
 import AuthHeader from "@/components/AuthHeader";
 
@@ -32,31 +33,37 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         >
           <div className="mx-auto flex max-w-5xl items-center gap-3 px-6 py-3.5">
-            <span
-              aria-hidden="true"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: 34,
-                height: 34,
-                borderRadius: 10,
-                background: "var(--green)",
-                boxShadow: "0 1px 2px rgba(14,159,110,0.35)",
-              }}
+            <Link
+              href="/"
+              className="flex items-center gap-3 no-underline"
+              style={{ color: "inherit", textDecoration: "none" }}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round">
-                <path d="M4 15l5-5 4 4 7-8" />
-              </svg>
-            </span>
-            <div style={{ lineHeight: 1.1 }}>
-              <h1 className="section-title" style={{ fontSize: "16px" }}>
-                Portfolio Rebalancer
-              </h1>
-              <p style={{ fontSize: "12px", color: "var(--ink-soft)", marginTop: 1 }}>
-                Pakistan Stock Exchange
-              </p>
-            </div>
+              <span
+                aria-hidden="true"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 34,
+                  height: 34,
+                  borderRadius: 10,
+                  background: "var(--green)",
+                  boxShadow: "0 1px 2px rgba(14,159,110,0.35)",
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round">
+                  <path d="M4 15l5-5 4 4 7-8" />
+                </svg>
+              </span>
+              <div style={{ lineHeight: 1.1 }}>
+                <h1 className="section-title" style={{ fontSize: "16px" }}>
+                  Portfolio Rebalancer
+                </h1>
+                <p style={{ fontSize: "12px", color: "var(--ink-soft)", marginTop: 1 }}>
+                  Pakistan Stock Exchange
+                </p>
+              </div>
+            </Link>
             <AuthHeader />
           </div>
         </header>
