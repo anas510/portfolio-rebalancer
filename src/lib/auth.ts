@@ -86,6 +86,41 @@ export async function authenticateUser(email: string, password: string): Promise
   return { id: user.id, email: user.email, isAdmin: user.isAdmin };
 }
 
+export async function updateUserPassword(
+  userId: number,
+  currentPassword: string,
+  newPassword: string
+): Promise<void> {
+  const client = await db();
+  const res = await client.execute({
+    sql: "SELECT id, password_hash, is_blocked FROM user WHERE id = ?",
+    args: [userId],
+  });
+  if (res.rows.length === 0) throw new AuthError("Unauthorized", 401);
+
+  const row = res.rows[0] as Row;
+  if (Number(row.is_blocked ?? 0) === 1) {
+    throw new AuthError("This account has been blocked.", 403);
+  }
+
+  const passwordHash = String(row.password_hash);
+  if (!(await verifyPassword(currentPassword, passwordHash))) {
+    throw new AuthError("Current password is incorrect.", 401);
+  }
+
+  const pwdErr = validatePassword(newPassword);
+  if (pwdErr) throw new AuthError(pwdErr, 400);
+  if (currentPassword === newPassword) {
+    throw new AuthError("New password must be different from your current password.", 400);
+  }
+
+  const newHash = await hashPassword(newPassword);
+  await client.execute({
+    sql: "UPDATE user SET password_hash = ? WHERE id = ?",
+    args: [newHash, userId],
+  });
+}
+
 export interface AdminUserRow {
   id: number;
   email: string;
