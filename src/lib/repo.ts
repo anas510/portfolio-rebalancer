@@ -247,14 +247,25 @@ export async function deletePortfolio(userId: number, id: number): Promise<void>
 
 // ---- Portfolio holdings ---------------------------------------------------
 
-export async function getPortfolioHoldings(userId: number, id: number): Promise<ActualHolding[]> {
+export async function getPortfolioHoldings(
+  userId: number,
+  id: number
+): Promise<{ holdings: ActualHolding[]; targetSize: number | null }> {
   await assertPortfolioOwner(userId, id);
   const client = await db();
+  const meta = await client.execute({
+    sql: "SELECT target_size FROM portfolio WHERE id = ?",
+    args: [id],
+  });
+  const targetSizeRaw = meta.rows.length ? (meta.rows[0] as Row).target_size : null;
+  const targetSizeNum = targetSizeRaw == null ? NaN : Number(targetSizeRaw);
+  const targetSize = Number.isFinite(targetSizeNum) && targetSizeNum > 0 ? targetSizeNum : null;
+
   const res = await client.execute({
     sql: "SELECT symbol, name, quantity, price, value FROM portfolio_holding WHERE portfolio_id = ? ORDER BY id",
     args: [id],
   });
-  return res.rows.map((r) => {
+  const holdings = res.rows.map((r) => {
     const row = r as Row;
     return {
       symbol: String(row.symbol),
@@ -264,9 +275,15 @@ export async function getPortfolioHoldings(userId: number, id: number): Promise<
       value: row.value == null ? undefined : Number(row.value),
     } satisfies ActualHolding;
   });
+  return { holdings, targetSize };
 }
 
-export async function savePortfolioHoldings(userId: number, id: number, holdings: ActualHolding[]): Promise<void> {
+export async function savePortfolioHoldings(
+  userId: number,
+  id: number,
+  holdings: ActualHolding[],
+  targetSize?: number | null
+): Promise<void> {
   await assertPortfolioOwner(userId, id);
   const client = await db();
   await client.execute({ sql: "DELETE FROM portfolio_holding WHERE portfolio_id = ?", args: [id] });
@@ -277,7 +294,14 @@ export async function savePortfolioHoldings(userId: number, id: number, holdings
       args: [id, h.symbol.toUpperCase(), h.name ?? null, h.quantity || 0, h.price || 0, h.value ?? null],
     });
   }
-  await client.execute({ sql: "UPDATE portfolio SET updated_at = datetime('now') WHERE id = ?", args: [id] });
+  if (targetSize !== undefined) {
+    await client.execute({
+      sql: "UPDATE portfolio SET target_size = ?, updated_at = datetime('now') WHERE id = ?",
+      args: [targetSize != null && targetSize > 0 ? targetSize : null, id],
+    });
+  } else {
+    await client.execute({ sql: "UPDATE portfolio SET updated_at = datetime('now') WHERE id = ?", args: [id] });
+  }
 }
 
 // ---- Run history ----------------------------------------------------------

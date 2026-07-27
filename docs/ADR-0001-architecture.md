@@ -103,3 +103,15 @@ remain as secondary options.
   New routes: `/api/portfolios` (list/create/select/rename/delete), `/api/holdings` (GET/PUT).
   `/api/model` and `/api/plan` now resolve the effective model for the selected portfolio, and the
   model save takes a scope ("default" shared vs "custom" per-portfolio).
+
+## Addendum (2026-07-27): auth, live UX, portfolio size, plan sync
+- **Authentication:** JWT cookie sessions (`pr_session`), login/register, admin panel, `/account`
+  password change. Middleware protects routes; header auth state refreshes on navigation.
+- **Portfolio target size:** `portfolio.target_size` persists the total portfolio size per portfolio;
+  cash is derived as `size − stock holdings` and `%` columns recompute when prices or size change
+  (`src/lib/portfolioValue.ts`). Switching portfolios loads the saved size (or derives from holdings).
+- **Plan auto-sync:** once generated, the rebalancing plan refreshes when actual holdings, model
+  weights, portfolio switch, or plan options change (debounced client regen via `/api/plan`).
+- **Loading UX:** portfolio switch/create/rename/delete and initial load show a banner spinner;
+  main sections dim until data is ready (`LoadingIndicator`, `content-loading` in globals.css).
+- **Formatting:** percentages display to two decimal places (`format.pct`).

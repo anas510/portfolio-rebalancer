@@ -1,43 +1,47 @@
 "use client";
 
-import { useState } from "react";
+import LoadingIndicator from "@/components/LoadingIndicator";
 import type { PortfolioSummary } from "@/lib/types";
 
 interface Props {
   portfolios: PortfolioSummary[];
   selectedId: number | null;
-  onSelect: (id: number) => void;
-  onChanged: () => void; // reload list after create/rename/delete
+  busy?: boolean;
+  busyLabel?: string;
+  onSelect: (id: number) => void | Promise<void>;
+  onCreate: (name: string) => void | Promise<void>;
+  onRename: (id: number, name: string) => void | Promise<void>;
+  onDelete: (id: number) => void | Promise<void>;
 }
 
-export default function PortfolioBar({ portfolios, selectedId, onSelect, onChanged }: Props) {
-  const [busy, setBusy] = useState(false);
+export default function PortfolioBar({
+  portfolios,
+  selectedId,
+  busy = false,
+  busyLabel,
+  onSelect,
+  onCreate,
+  onRename,
+  onDelete,
+}: Props) {
   const current = portfolios.find((p) => p.id === selectedId);
 
-  async function act(action: string, payload: Record<string, unknown> = {}) {
-    setBusy(true);
-    try {
-      await fetch("/api/portfolios", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, ...payload }),
-      });
-      onChanged();
-    } finally {
-      setBusy(false);
-    }
+  async function handleSelect(id: number) {
+    if (busy || id === selectedId) return;
+    await onSelect(id);
   }
 
   return (
     <div className="card flex flex-wrap items-center justify-between gap-3">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <span className="eyebrow">Portfolio</span>
         <select
           className="input"
           style={{ minWidth: 220 }}
           value={selectedId ?? ""}
           disabled={busy}
-          onChange={(e) => onSelect(Number(e.target.value))}
+          aria-busy={busy}
+          onChange={(e) => void handleSelect(Number(e.target.value))}
         >
           {portfolios.map((p) => (
             <option key={p.id} value={p.id}>
@@ -46,6 +50,7 @@ export default function PortfolioBar({ portfolios, selectedId, onSelect, onChang
             </option>
           ))}
         </select>
+        {busy && busyLabel && <LoadingIndicator label={busyLabel} size="sm" />}
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <button
@@ -53,7 +58,7 @@ export default function PortfolioBar({ portfolios, selectedId, onSelect, onChang
           disabled={busy}
           onClick={() => {
             const name = window.prompt("New portfolio name?", "New Portfolio");
-            if (name) act("create", { name });
+            if (name) void onCreate(name);
           }}
         >
           + New
@@ -63,7 +68,7 @@ export default function PortfolioBar({ portfolios, selectedId, onSelect, onChang
           disabled={busy || !current}
           onClick={() => {
             const name = window.prompt("Rename portfolio", current?.name ?? "");
-            if (name && current) act("rename", { id: current.id, name });
+            if (name && current) void onRename(current.id, name);
           }}
         >
           Rename
@@ -74,7 +79,7 @@ export default function PortfolioBar({ portfolios, selectedId, onSelect, onChang
           title={portfolios.length <= 1 ? "Keep at least one portfolio" : ""}
           onClick={() => {
             if (current && window.confirm(`Delete “${current.name}” and its saved holdings?`)) {
-              act("delete", { id: current.id });
+              void onDelete(current.id);
             }
           }}
         >

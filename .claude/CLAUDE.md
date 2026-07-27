@@ -18,7 +18,7 @@ against a saved **model portfolio**. See `README.md` for the full picture.
 - Image reading: `src/lib/ocr.ts` (+ `preprocess.ts`) for free OCR; `src/lib/vision.ts` for optional Claude Vision. Parsing: `src/lib/parse.ts` (OCR text, CSV, and `parseHoldingsHtml` for saved brokerage pages — the most accurate current-portfolio path). Symbol reconciliation + fuzzy snapping: `src/lib/symbols.ts`.
 - Data access: `src/lib/repo.ts` over `src/lib/db.ts`.
 - API: `src/app/api/{model,plan,prices,symbols,extract,config,portfolios,holdings}/route.ts` (all `runtime = "nodejs"`).
-- UI: `src/app/page.tsx` orchestrates the engine toggle + `ModelSection`, `ActualSection`, `PlanSection`.
+- UI: `src/app/page.tsx` orchestrates the engine toggle + `ModelSection`, `ActualSection`, `PlanSection`, `PortfolioBar`. Portfolio switch/load/create/rename/delete shows a loading banner and dims sections until ready (`LoadingIndicator`).
 
 ## Key domain facts
 - The **model image uses full company names**; the **holdings image uses tickers**. `symbol_alias` + fuzzy snapping reconcile them. Seed list is in `src/lib/symbols.ts`.
@@ -27,6 +27,7 @@ against a saved **model portfolio**. See `README.md` for the full picture.
 - PSX trades **whole shares** -> target units are always integers.
 - A stock's value is ALWAYS quantity x price (only CASH carries an explicit value); `rebalance.ts` must never trust a stock `value` field, or price edits stop affecting the plan.
 - Rebalance supports partial mode via `rebalanceSymbols` (only listed symbols trade; others HOLD).
+- Portfolio **target size** (`portfolio.target_size`) derives cash and drives `%` columns; logic in `src/lib/portfolioValue.ts`.
 - Live PSX price fetch (`src/lib/psx.ts`) is **best-effort and optional**; never let its failure break plan generation.
 
 ## When you change things

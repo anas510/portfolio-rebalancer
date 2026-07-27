@@ -114,6 +114,7 @@ async function runMigrations(db: Client): Promise<void> {
   await ensureColumn(db, "model_portfolio", "user_id", "INTEGER REFERENCES user(id)");
   await ensureColumn(db, "rebalance_run", "user_id", "INTEGER REFERENCES user(id)");
   await ensureColumn(db, "user", "is_blocked", "INTEGER NOT NULL DEFAULT 0");
+  await ensureColumn(db, "portfolio", "target_size", "REAL");
 }
 
 async function seedAdminUser(db: Client): Promise<void> {

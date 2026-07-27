@@ -7,7 +7,7 @@ export function pkr(n: number): string {
 
 export function pct(n: number): string {
   if (!Number.isFinite(n)) return "—";
-  return `${n.toFixed(1)}%`;
+  return `${n.toFixed(2)}%`;
 }
 
 export function num(n: number): string {

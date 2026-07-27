@@ -398,6 +398,68 @@ select.input {
   color: #93540b;
 }
 
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner {
+  display: inline-block;
+  border-radius: 50%;
+  border: 2px solid var(--rule);
+  border-top-color: var(--green);
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+.spinner-sm {
+  width: 14px;
+  height: 14px;
+}
+
+.spinner-md {
+  width: 18px;
+  height: 18px;
+}
+
+.loading-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.loading-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--r-ctrl);
+  background: var(--green-tint);
+  border: 1px solid rgba(14, 159, 110, 0.2);
+  color: var(--green-strong);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.content-loading {
+  opacity: 0.55;
+  pointer-events: none;
+  user-select: none;
+  transition: opacity 0.15s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 1.4s;
+  }
+  .content-loading {
+    transition: none;
+  }
+}
+
 /* ---- Motion / a11y -------------------------------------------------------- */
 
 @keyframes rise {

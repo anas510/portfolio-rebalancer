@@ -11,6 +11,7 @@
 // rounded and any rounding remainder simply lands back in cash.
 // ---------------------------------------------------------------------------
 
+import { holdingMarketValue } from "./portfolioValue";
 import type { ActualHolding, ModelHolding, PlanRow, RebalancePlan } from "./types";
 
 export interface RebalanceInput {
@@ -28,16 +29,6 @@ export interface RebalanceInput {
 }
 
 const CASH = "CASH";
-
-/**
- * Market value of a holding. For a stock this is ALWAYS quantity × price — the
- * source of truth — so editing a price always changes the plan. Only the CASH
- * line carries an explicit value.
- */
-function holdingValue(h: ActualHolding): number {
-  if (h.symbol.toUpperCase() === CASH) return h.value ?? h.quantity ?? 0;
-  return (h.quantity || 0) * (h.price || 0);
-}
 
 function round(n: number, mode: "nearest" | "floor"): number {
   return mode === "floor" ? Math.floor(n) : Math.round(n);
@@ -72,10 +63,10 @@ export function rebalance(input: RebalanceInput): RebalancePlan {
   }
 
   // --- Totals ---------------------------------------------------------------
-  const currentCash = holdingValue(
+  const currentCash = holdingMarketValue(
     input.actual.find((h) => h.symbol.toUpperCase() === CASH) ?? { symbol: CASH, quantity: 0, price: 1, value: 0 }
   );
-  const currentValue = input.actual.reduce((s, h) => s + holdingValue(h), 0);
+  const currentValue = input.actual.reduce((s, h) => s + holdingMarketValue(h), 0);
   const investableTotal = currentValue + extraCash;
 
   // --- Build rows for the union of symbols ----------------------------------
@@ -90,8 +81,8 @@ export function rebalance(input: RebalanceInput): RebalancePlan {
 
     const isCash = symbol === CASH;
     const price = isCash ? 1 : actual?.price ?? 0;
-    const currentUnits = isCash ? holdingValue(actual ?? { symbol, quantity: 0, price: 1 }) : actual?.quantity ?? 0;
-    const curValue = actual ? holdingValue(actual) : 0;
+    const currentUnits = isCash ? holdingMarketValue(actual ?? { symbol, quantity: 0, price: 1 }) : actual?.quantity ?? 0;
+    const curValue = actual ? holdingMarketValue(actual) : 0;
     const currentPct = investableTotal > 0 ? (curValue / investableTotal) * 100 : 0;
 
     // Cash is the residual buffer; we report its target but do not "trade" it.

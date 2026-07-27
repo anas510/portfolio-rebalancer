@@ -13,7 +13,8 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const idParam = searchParams.get("portfolioId");
     const id = idParam ? Number(idParam) : await getSelectedPortfolioId(user.id);
-    return NextResponse.json({ portfolioId: id, holdings: await getPortfolioHoldings(user.id, id) });
+    const { holdings, targetSize } = await getPortfolioHoldings(user.id, id);
+    return NextResponse.json({ portfolioId: id, holdings, targetSize });
   } catch (err) {
     if (err instanceof ForbiddenError) {
       return NextResponse.json({ error: err.message }, { status: 403 });
@@ -27,10 +28,17 @@ export async function GET(req: Request) {
 export async function PUT(req: Request) {
   try {
     const user = await requireUser();
-    const body = (await req.json()) as { portfolioId?: number; holdings?: ActualHolding[] };
+    const body = (await req.json()) as { portfolioId?: number; holdings?: ActualHolding[]; targetSize?: number | null };
     const id = body.portfolioId ?? (await getSelectedPortfolioId(user.id));
-    await savePortfolioHoldings(user.id, id, body.holdings ?? []);
-    return NextResponse.json({ portfolioId: id, holdings: await getPortfolioHoldings(user.id, id) });
+    const targetSize =
+      body.targetSize === undefined
+        ? undefined
+        : body.targetSize != null && body.targetSize > 0
+          ? body.targetSize
+          : null;
+    await savePortfolioHoldings(user.id, id, body.holdings ?? [], targetSize);
+    const { holdings, targetSize: savedTargetSize } = await getPortfolioHoldings(user.id, id);
+    return NextResponse.json({ portfolioId: id, holdings, targetSize: savedTargetSize });
   } catch (err) {
     if (err instanceof ForbiddenError) {
       return NextResponse.json({ error: err.message }, { status: 403 });

@@ -15,9 +15,10 @@ interface Props {
   engine: Engine;
   portfolioId: number | null;
   onSaved: (model: { holdings: ModelHolding[]; name: string; updatedAt: string }) => void;
+  onModelChange?: (holdings: ModelHolding[]) => void;
 }
 
-export default function ModelSection({ aliases, engine, portfolioId, onSaved }: Props) {
+export default function ModelSection({ aliases, engine, portfolioId, onSaved, onModelChange }: Props) {
   const [rows, setRows] = useState<ModelHolding[]>([]);
   const [name, setName] = useState("Model Portfolio");
   const [busy, setBusy] = useState(false);
@@ -53,6 +54,10 @@ export default function ModelSection({ aliases, engine, portfolioId, onSaved }: 
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [portfolioId]);
+
+  useEffect(() => {
+    onModelChange?.(rows);
+  }, [rows, onModelChange]);
 
   async function reloadSaved() {
     try {

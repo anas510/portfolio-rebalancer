@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { ocrImage } from "@/lib/ocr";
 import {
   parseActualCsv,
@@ -10,6 +10,13 @@ import {
 import { extractActual } from "@/lib/extractClient";
 import type { SymbolAlias } from "@/lib/symbols";
 import type { ActualHolding } from "@/lib/types";
+import {
+  computePortfolioTotals,
+  holdingMarketValue,
+  isCashSymbol,
+  resolvePortfolioSize,
+  syncCashToPortfolioSize,
+} from "@/lib/portfolioValue";
 import type { Engine } from "@/app/page";
 import { pkr, pct } from "@/lib/format";
 
@@ -19,11 +26,12 @@ interface Props {
   rows: ActualHolding[];
   setRows: (rows: ActualHolding[]) => void;
   portfolioId: number | null;
+  portfolioSize: string;
+  setPortfolioSize: (value: string) => void;
 }
 
-const isCashSym = (s: string) => s.trim().toUpperCase() === "CASH";
-const rowValue = (r: ActualHolding) =>
-  isCashSym(r.symbol) ? (r.value ?? 0) : (r.quantity || 0) * (r.price || 0);
+const isCashSym = isCashSymbol;
+const rowValue = holdingMarketValue;
 
 export default function ActualSection({
   aliases,
@@ -31,15 +39,38 @@ export default function ActualSection({
   rows,
   setRows,
   portfolioId,
+  portfolioSize,
+  setPortfolioSize,
 }: Props) {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [raw, setRaw] = useState("");
   const [showRaw, setShowRaw] = useState(false);
-  const [portfolioSize, setPortfolioSize] = useState("");
+  const portfolioSizeRef = useRef(portfolioSize);
+  portfolioSizeRef.current = portfolioSize;
   const imgRef = useRef<HTMLInputElement>(null);
   const csvRef = useRef<HTMLInputElement>(null);
   const htmlRef = useRef<HTMLInputElement>(null);
+
+  const applyPortfolioSize = useCallback((rows: ActualHolding[], sizeStr = portfolioSizeRef.current) => {
+    const size = Number(sizeStr);
+    if (!sizeStr || !size || size <= 0) return rows;
+    return syncCashToPortfolioSize(rows, size);
+  }, []);
+
+  const commitRows = useCallback(
+    (rows: ActualHolding[]) => {
+      setRows(applyPortfolioSize(rows));
+    },
+    [applyPortfolioSize, setRows],
+  );
+
+  function onPortfolioSizeChange(value: string) {
+    setPortfolioSize(value);
+    const size = Number(value);
+    if (!value || !size || size <= 0) return;
+    setRows(applyPortfolioSize(rows, value));
+  }
 
   // Fetch current prices for rows missing them. Returns merged rows + count.
   async function fillPrices(
@@ -88,7 +119,7 @@ export default function ActualSection({
         filled,
         attempted,
       } = await fillPrices(parsed, true);
-      setRows(merged);
+      commitRows(merged);
       setStatus(
         `${sourceMsg} ${filled > 0 ? `Filled ${filled}/${attempted} prices from PSX.` : "PSX returned no prices — enter the missing ones manually."}`,
       );
@@ -104,7 +135,7 @@ export default function ActualSection({
     setStatus("Reading saved page…");
     try {
       const parsed = parseHoldingsHtml(await file.text(), aliases);
-      setRows(parsed);
+      commitRows(parsed);
       if (parsed.length === 0) {
         setStatus(
           "Couldn't find a holdings table in that file. Is it the saved zar.sarmaaya page?",
@@ -128,7 +159,7 @@ export default function ActualSection({
     setBusy(true);
     try {
       const parsed = parseActualCsv(await file.text(), aliases);
-      setRows(parsed);
+      commitRows(parsed);
       await autoFillMissing(parsed, `Imported ${parsed.length} rows from CSV.`);
     } catch (e) {
       setStatus(`CSV import failed: ${String(e)}`);
@@ -143,7 +174,7 @@ export default function ActualSection({
       if (engine === "vision") {
         setStatus("Extracting with AI Vision…");
         const holdings = await extractActual(file);
-        setRows(holdings);
+        commitRows(holdings);
         if (holdings.length)
           await autoFillMissing(
             holdings,
@@ -163,7 +194,7 @@ export default function ActualSection({
       });
       setRaw(text);
       const parsed = parseActualText(text, aliases);
-      setRows(parsed);
+      commitRows(parsed);
       if (parsed.length)
         await autoFillMissing(
           parsed,
@@ -186,7 +217,7 @@ export default function ActualSection({
 
   function reparse() {
     const parsed = parseActualText(raw, aliases);
-    setRows(parsed);
+    commitRows(parsed);
     setStatus(`Re-parsed ${parsed.length} rows from the edited text.`);
   }
 
@@ -195,7 +226,7 @@ export default function ActualSection({
     setStatus("Fetching current prices from PSX…");
     try {
       const { rows: merged, filled, attempted } = await fillPrices(rows, false);
-      setRows(merged);
+      commitRows(merged);
       setStatus(
         filled > 0
           ? `Filled ${filled}/${attempted} prices from PSX.`
@@ -216,7 +247,11 @@ export default function ActualSection({
       const res = await fetch("/api/holdings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ portfolioId, holdings: rows }),
+        body: JSON.stringify({
+          portfolioId,
+          holdings: rows,
+          targetSize: Number(portfolioSize) > 0 ? Number(portfolioSize) : null,
+        }),
       });
       const d = await res.json();
       setStatus(
@@ -239,7 +274,11 @@ export default function ActualSection({
           ? `/api/holdings?portfolioId=${portfolioId}`
           : "/api/holdings";
       const d = await (await fetch(url)).json();
-      setRows(d.holdings ?? []);
+      const holdings: ActualHolding[] = d.holdings ?? [];
+      const sizeStr = resolvePortfolioSize(d.targetSize, holdings);
+      setPortfolioSize(sizeStr);
+      const size = Number(sizeStr);
+      setRows(size > 0 ? syncCashToPortfolioSize(holdings, size) : holdings);
       setStatus(`Loaded ${(d.holdings ?? []).length} saved holdings.`);
     } catch (e) {
       setStatus(`Load failed: ${String(e instanceof Error ? e.message : e)}`);
@@ -248,51 +287,22 @@ export default function ActualSection({
     }
   }
 
-  const stockValue = rows
-    .filter((r) => !isCashSym(r.symbol))
-    .reduce((s, r) => s + rowValue(r), 0);
-  const cashValue = rows
-    .filter((r) => isCashSym(r.symbol))
-    .reduce((s, r) => s + rowValue(r), 0);
-  const totalValue = stockValue + cashValue;
-
-  function fillCashFromSize() {
-    const size = Number(portfolioSize);
-    if (!size || size <= 0) {
-      setStatus("Enter a total portfolio size first.");
-      return;
-    }
-    const cash = Math.round((size - stockValue) * 100) / 100;
-    const others = rows.filter((r) => !isCashSym(r.symbol));
-    setRows([
-      ...others,
-      {
-        symbol: "CASH",
-        name: "Cash",
-        quantity: 0,
-        price: 1,
-        value: Math.max(0, cash),
-      },
-    ]);
-    setStatus(
-      cash < 0
-        ? `Holdings (${pkr(stockValue)}) already exceed the portfolio size — cash set to 0. Check prices/size.`
-        : `Cash set to ${pkr(cash)} (size ${pkr(size)} − holdings ${pkr(stockValue)}).`,
-    );
-  }
+  const { totalValue } = computePortfolioTotals(rows);
+  const sizeLocked = Boolean(portfolioSize && Number(portfolioSize) > 0);
 
   function update(i: number, patch: Partial<ActualHolding>) {
-    setRows(rows.map((row, idx) => (idx === i ? { ...row, ...patch } : row)));
+    const next = rows.map((row, idx) => (idx === i ? { ...row, ...patch } : row));
+    if (isCashSym(rows[i]?.symbol ?? "") && sizeLocked) {
+      setRows(next);
+      return;
+    }
+    commitRows(next);
   }
-  const remove = (i: number) => setRows(rows.filter((_, idx) => idx !== i));
-  const addRow = () =>
-    setRows([...rows, { symbol: "", quantity: 0, price: 0 }]);
+  const remove = (i: number) => commitRows(rows.filter((_, idx) => idx !== i));
+  const addRow = () => commitRows([...rows, { symbol: "", quantity: 0, price: 0 }]);
   const addCash = () => {
     if (rows.some((r) => isCashSym(r.symbol))) return;
-    setRows([
-      ...rows,
-      { symbol: "CASH", name: "Cash", quantity: 0, price: 1, value: 0 },
-    ]);
+    commitRows([...rows, { symbol: "CASH", name: "Cash", quantity: 0, price: 1, value: 0 }]);
   };
 
   return (
@@ -404,16 +414,14 @@ export default function ActualSection({
             style={{ maxWidth: 170 }}
             value={portfolioSize}
             placeholder="e.g. 1000000"
-            onChange={(e) => setPortfolioSize(e.target.value)}
+            onChange={(e) => onPortfolioSizeChange(e.target.value)}
           />
         </label>
-        <button
-          className="btn-ghost"
-          disabled={busy || rows.length === 0}
-          onClick={fillCashFromSize}
-        >
-          Set cash = size − holdings
-        </button>
+        {sizeLocked && (
+          <span style={{ fontSize: 12, color: "var(--ink-soft)", alignSelf: "center" }}>
+            Cash and % update automatically
+          </span>
+        )}
       </div>
 
       {status && <p className="mb-2 text-xs text-slate-500">{status}</p>}
@@ -505,6 +513,8 @@ export default function ActualSection({
                           className="input"
                           style={{ maxWidth: 150 }}
                           value={r.value ?? 0}
+                          readOnly={sizeLocked}
+                          title={sizeLocked ? "Derived from total portfolio size − holdings" : undefined}
                           onChange={(e) =>
                             update(i, { value: Number(e.target.value) })
                           }

@@ -1,16 +1,17 @@
 "use client";
 
-import { useState } from "react";
-import type { ActualHolding, RebalancePlan } from "@/lib/types";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { ActualHolding, ModelHolding, RebalancePlan } from "@/lib/types";
 import { num, pct, pkr } from "@/lib/format";
 
 interface Props {
   actual: ActualHolding[];
+  model: ModelHolding[];
   modelSaved: boolean;
   portfolioId: number | null;
 }
 
-export default function PlanSection({ actual, modelSaved, portfolioId }: Props) {
+export default function PlanSection({ actual, model, modelSaved, portfolioId }: Props) {
   const [extraCash, setExtraCash] = useState(0);
   const [rounding, setRounding] = useState<"nearest" | "floor">("nearest");
   const [useLivePrices, setUseLivePrices] = useState(false);
@@ -23,8 +24,9 @@ export default function PlanSection({ actual, modelSaved, portfolioId }: Props) 
   const tradable = actual.map((r) => r.symbol.toUpperCase()).filter((s) => s && s !== "CASH");
   const toggle = (sym: string) => setSelected((s) => ({ ...s, [sym]: !s[sym] }));
   const chosen = tradable.filter((s) => selected[s]);
+  const skipAutoRegen = useRef(true);
 
-  async function generate() {
+  const generate = useCallback(async (options?: { save?: boolean }) => {
     setBusy(true);
     setError("");
     try {
@@ -32,25 +34,48 @@ export default function PlanSection({ actual, modelSaved, portfolioId }: Props) 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          model: model.length > 0 ? model : undefined,
           actual,
           extraCash,
           rounding,
           useLivePrices,
           portfolioId,
           rebalanceSymbols: scope === "selected" ? chosen : [],
-          save: true,
+          save: options?.save ?? true,
         }),
       });
       const d = await res.json();
       if (d.error) throw new Error(d.error);
       setPlan(d.plan);
+      skipAutoRegen.current = true;
     } catch (e) {
       setError(String(e));
       setPlan(null);
     } finally {
       setBusy(false);
     }
-  }
+  }, [actual, model, extraCash, rounding, useLivePrices, portfolioId, scope, chosen]);
+
+  useEffect(() => {
+    setPlan(null);
+    setError("");
+    skipAutoRegen.current = true;
+  }, [portfolioId]);
+
+  useEffect(() => {
+    if (!plan) {
+      skipAutoRegen.current = true;
+      return;
+    }
+    if (skipAutoRegen.current) {
+      skipAutoRegen.current = false;
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void generate({ save: false });
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [actual, model, extraCash, rounding, useLivePrices, scope, selected, portfolioId, plan, generate]);
 
   function exportCsv() {
     if (!plan) return;
@@ -108,7 +133,7 @@ export default function PlanSection({ actual, modelSaved, portfolioId }: Props) 
             <option value="selected">Selected shares only</option>
           </select>
         </label>
-        <button className="btn-primary" disabled={!canGenerate} onClick={generate}>
+        <button className="btn-primary" disabled={!canGenerate} onClick={() => void generate()}>
           {busy ? "Generating…" : "Generate plan"}
         </button>
       </div>

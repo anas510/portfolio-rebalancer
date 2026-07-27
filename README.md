@@ -93,8 +93,8 @@ but the dense holdings grid is hard for them.
 
 **CSV / units workflow.** Import a CSV of `symbol, quantity, avg/current price` (or type rows in),
 click **Fetch PSX prices** to fill current prices (best-effort; enter manually if the source is
-blocked), then enter a **Total portfolio size** and click **Set cash = size − holdings** to derive
-the CASH line automatically.
+blocked), then enter a **Total portfolio size** — cash and `%` columns update automatically
+(`size − holdings`). Save holdings to persist the size per portfolio.
 
 ### Optional: AI Vision (accurate)
 
@@ -151,11 +151,12 @@ portfolio-rebalancer/
 │  │     ├─ symbols/route.ts    # GET/POST/DELETE symbol aliases
 │  │     ├─ extract/route.ts    # POST -> Claude Vision extraction (opt-in)
 │  │     └─ config/route.ts     # GET  -> feature flags (visionAvailable, …)
-│  ├─ components/                # ModelSection, ActualSection, PlanSection
+│  ├─ components/                # ModelSection, ActualSection, PlanSection, PortfolioBar, …
 │  └─ lib/
 │     ├─ db.ts          # libsql client (file or Turso) + schema init
 │     ├─ repo.ts        # typed data-access helpers
 │     ├─ types.ts       # domain types
+│     ├─ portfolioValue.ts  # holding valuation, cash sync, portfolio size helpers
 │     ├─ symbols.ts     # seed aliases + fuzzy resolver/snapping
 │     ├─ ocr.ts         # tesseract.js (browser) worker
 │     ├─ preprocess.ts  # canvas greyscale/contrast/upscale for OCR
@@ -182,17 +183,21 @@ portfolio-rebalancer/
 
 - `model_portfolio (id, name, is_active, updated_at)` — model library; `is_active = 1` marks the shared **default** model.
 - `model_holding (id, model_id, symbol, name, target_pct)` — target weights.
-- `portfolio (id, name, model_id, is_selected, updated_at)` — named portfolios; `model_id` NULL means "use the shared default model", otherwise a custom model for this portfolio.
+- `portfolio (id, name, model_id, is_selected, target_size, updated_at)` — named portfolios; `model_id` NULL means "use the shared default model", otherwise a custom model for this portfolio. `target_size` stores the optional total portfolio size (PKR) used to derive cash.
 - `portfolio_holding (id, portfolio_id, symbol, name, quantity, price, value)` — saved current-holdings snapshot per portfolio.
 - `symbol_alias (symbol, name)` — ticker ⇄ company-name mappings.
 - `rebalance_run (id, created_at, cash_available, investable_total, plan_json)` — plan history.
 
-**Portfolios.** Use the portfolio bar to create/rename/delete/switch portfolios. Each keeps its own
-saved holdings (Save holdings / Load saved). The model is shared by default; when saving a model you
+**Portfolios.** Use the portfolio bar to create/rename/delete/switch portfolios. A loading banner
+and spinner appear while portfolios load or while switching — the main sections are dimmed and
+non-interactive until the operation completes. Each portfolio keeps its own saved holdings and
+**total portfolio size** (Save holdings / Load saved). The model is shared by default; when saving a model you
 can choose **All portfolios (shared default)** or **Only this portfolio** (a custom override).
 
 **Rebalance scope.** In the plan, choose **Whole portfolio** or **Selected shares only** (tick the
-symbols to trade) — non-selected holdings are left untouched.
+symbols to trade) — non-selected holdings are left untouched. After the first **Generate plan**,
+the plan auto-updates when holdings, model weights, prices, cash, or portfolio options change.
+Percentages are shown to **two decimal places**.
 
 > Note: a stock's value is always `quantity × current price` — editing a price always updates the
 > plan. Only the CASH line carries an explicit amount.
